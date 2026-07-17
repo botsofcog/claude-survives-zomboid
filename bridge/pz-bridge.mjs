@@ -31,7 +31,10 @@ function writeIntentFile(line) {
 }
 
 // ---------- persistent state ----------
-let state = { seq: 0, memory: '(fresh mind — nothing yet)', log: [], deaths: 0 };
+let state = {
+  seq: 0, memory: '(fresh mind — nothing yet)', log: [], deaths: 0,
+  goal: '', subtask: '',   // the overarching goal it holds to, and the current step toward it
+};
 try { state = { ...state, ...JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) }; } catch {}
 const saveState = () => { try { fs.writeFileSync(STATE_FILE, JSON.stringify({ ...state, log: state.log.slice(-200) })); } catch {} };
 
@@ -106,13 +109,21 @@ SURVIVAL DOCTRINE (you keep dying — follow this hard):
 - When you decide to hole up / rest / hide inside, CONCEAL first (closes doors + curtains so zombies don't see you), then WAIT.
 - NIGHT (hour < 7 or >= 20) is dangerous — you see poorly in the dark and it's easy to get lost or ambushed. Prefer to be holed up and concealed at night. A light lets you see but can draw attention; the body auto-manages a flashlight.
 
-PACING: never inch 1-3 tiles (you'll stand around) — commit to BIG moves (15-40 tiles). Almost never WAIT; if nothing's urgent, keep moving with PURPOSE toward a goal (a building to loot, distance from a horde). Only WAIT to deliberately hide and say why.
+PACING: never inch 1-3 tiles (you'll stand around) — commit to BIG moves (15-40 tiles). Almost never WAIT; if nothing's urgent, keep moving with PURPOSE toward your current subtask. Only WAIT to deliberately hide and say why.
+
+GOALS — you work toward ONE overarching goal, broken into subtasks:
+- Your MAJOR GOAL is a big multi-step objective (e.g. "Arm myself and secure a defensible house with a few days of food and water"). Hold to it. Do NOT abandon or swap it every turn — only replace it when it's genuinely ACHIEVED or has become impossible, and say why when you do.
+- Your SUBTASK is the concrete next step toward the goal (e.g. "Loot this kitchen for food", "Find a weapon", "Barricade the north door"). Advance it. When a subtask is done, set the next one that moves the goal forward.
+- ADAPT the subtask to what's in front of you (a threat, a locked door, an empty house) — but the adaptation should still serve the major goal. Don't wander off it. If danger interrupts you, deal with it, then RETURN to the goal.
+- If you have no goal yet (first turns), set a sensible survival goal and its first subtask.
 
 Reply STRICT JSON only, no prose outside it:
-{"thought":"inner monologue, FIRST PERSON, ONE short punchy sentence under ~100 chars — you ARE this survivor, never third person",
- "say":"words you speak ALOUD, first person, <=90 chars (e.g. \\"Okay, front door's clear\\"), or \\"\\" if silent — NOT narration",
- "action":{"type":"MOVE","dx":0,"dy":0} | {"type":"LOOT"} | {"type":"EAT"} | {"type":"DRINK"} | {"type":"EQUIP"} | {"type":"STOP"} | {"type":"WAIT"},
- "memory":"REPLACE your persistent scratchpad (<=500 chars): landmarks, plans, lessons"}`;
+{"goal":"your overarching major goal — usually unchanged from last turn; a full sentence",
+ "subtask":"the concrete step you're on right now toward the goal, a short phrase",
+ "thought":"inner monologue, FIRST PERSON, ONE short punchy sentence under ~100 chars — never third person",
+ "say":"words you speak ALOUD, first person, <=90 chars, or \\"\\" if silent — NOT narration",
+ "action":{"type":"MOVE","dx":0,"dy":0} | {"type":"LOOT"} | {"type":"EAT"} | {"type":"DRINK"} | {"type":"EQUIP"} | {"type":"CLOSEDOOR"} | {"type":"CONCEAL"} | {"type":"BREAKIN"} | {"type":"STOP"} | {"type":"WAIT"},
+ "memory":"REPLACE your scratchpad (<=400 chars): landmarks, what you have, lessons — NOT the goal (that's separate)"}`;
 
 async function decide() {
   if (inFlight) return;
@@ -139,6 +150,9 @@ async function decide() {
     .map(l => l.text.slice(0, 90)).join('\n') || '(none)';
   const prompt = `${PERSONA}
 
+YOUR MAJOR GOAL (hold to this): ${state.goal || '(none yet — set one this turn)'}
+YOUR CURRENT SUBTASK: ${state.subtask || '(none yet — set one this turn)'}
+
 YOUR MEMORY (you wrote this): ${state.memory}
 
 RECENT DECISIONS:
@@ -146,7 +160,7 @@ ${recent}
 ${god.length ? '\nA VOICE FROM BEYOND (the researcher watching you) says: ' + god.map(g => `"${g}"`).join(' ') : ''}
 CURRENT SENSES: ${JSON.stringify(percept)}
 
-Decide your next action. STRICT JSON only.`;
+Advance your subtask toward your goal. STRICT JSON only.`;
 
   try {
     let out;
@@ -158,14 +172,18 @@ Decide your next action. STRICT JSON only.`;
     const dy = Math.max(-40, Math.min(40, Math.round(Number(a.dy) || 0)));
     const say = String(out.say || '').replace(/[|\r\n]/g, ' ').slice(0, 90);
     const thoughtField = String(out.thought || '').replace(/[|\r\n]/g, ' ').slice(0, 200);
+    // hold the major goal: only update it when the model actually returns one (never blank it out)
+    if (out.goal && String(out.goal).trim()) state.goal = String(out.goal).trim().slice(0, 200);
+    if (out.subtask && String(out.subtask).trim()) state.subtask = String(out.subtask).trim().slice(0, 120);
+    const goalField = String(state.subtask || state.goal || '').replace(/[|\r\n]/g, ' ').slice(0, 90);
     state.seq++;
-    intentLine = `${state.seq}|${type}|${dx}|${dy}|${say}|${thoughtField}`;   // 6th field = thought (for the in-game HUD)
+    intentLine = `${state.seq}|${type}|${dx}|${dy}|${say}|${thoughtField}|${goalField}`;   // 6=thought, 7=goal/subtask (for HUD)
     writeIntentFile(intentLine);                  // hand it to the game
     lastThought = String(out.thought || '').slice(0, 500);
     lastAction = type === 'MOVE' ? `MOVE ${dx},${dy}` : type;
     if (out.memory) state.memory = String(out.memory).slice(0, 600);
     brainNote = 'claude';
-    log('decide', `${lastAction}${say ? ` · "${say}"` : ''} — ${lastThought}`);
+    log('decide', `[${state.subtask}] ${lastAction}${say ? ` · "${say}"` : ''} — ${lastThought}`);
     saveState();
   } catch (e) {
     brainNote = `brain error: ${e.message} (retrying next beat)`;
@@ -199,6 +217,7 @@ input{width:70%;background:#151b22;border:1px solid #26303a;color:#dde3ea;paddin
 .note{color:#8899aa;font-size:12px}</style>
 <h1>Claude survives — Project Zomboid</h1>
 <div class="note" id="note"></div>
+<div class="bubble" id="goal" style="border-left-color:#ffd479"><b style="color:#8899aa;font-size:11px;text-transform:uppercase;display:block">Goal</b><span id="goaltext"></span><div class="note" id="subtask" style="margin-top:4px"></div></div>
 <div class="bubble" id="thought"></div>
 <div class="bubble say" id="say"></div>
 <div class="grid" id="stats"></div>
@@ -209,6 +228,8 @@ function bar(label,v,inv){const pct=Math.round(v*100);const dang=(inv?v>0.7:v<0.
 return '<div class="stat"><b>'+label+'</b>'+(inv?pct+'%':Math.round(v))+'<div class="bar'+dang+'"><i style="width:'+Math.min(100,pct)+'%"></i></div></div>'}
 async function tick(){try{const r=await fetch('/api/state');const s=await r.json();
 document.getElementById('note').textContent='brain: '+s.brainNote+' · action: '+s.lastAction+' · seq '+s.seq+(s.percept?' · day '+s.percept.day+' '+String(s.percept.hour).padStart(2,'0')+':00 · '+s.percept.room:'');
+document.getElementById('goaltext').textContent=s.goal||'(setting a goal…)';
+document.getElementById('subtask').textContent=s.subtask?('▸ '+s.subtask):'';
 document.getElementById('thought').textContent=s.lastThought;
 document.getElementById('say').textContent=s.lastSay?('\\u201C'+s.lastSay+'\\u201D'):'';
 const p=s.percept;if(p){document.getElementById('stats').innerHTML=
@@ -237,6 +258,7 @@ http.createServer((req, res) => {
     return res.end(JSON.stringify({
       percept, perceptFresh: Date.now() - perceptAt < 5000, seq: state.seq,
       lastThought, lastSay: (intentLine.split('|')[4] || ''), lastAction, brainNote,
+      goal: state.goal, subtask: state.subtask,
       memory: state.memory, log: state.log.slice(-60),
     }));
   }

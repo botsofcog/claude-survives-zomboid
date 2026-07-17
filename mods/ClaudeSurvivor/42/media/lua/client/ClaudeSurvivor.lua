@@ -41,7 +41,7 @@ local PANIC_LEN         = 180    -- ~3s paused
 
 -- shared with the HUD (below)
 local HUD = {
-  action = "—", thought = "Booting up. Let's see this body.", say = "",
+  action = "—", thought = "Booting up. Let's see this body.", say = "", goal = "",
   hp = 100, hunger = 0, thirst = 0, fatigue = 0, panic = 0,
   zNear = 0, zClose = 0, zDist = -1, zDir = "-",
   foods = 0, waters = 0, weapon = "none", room = "", qlen = 0, day = 0, hour = 0,
@@ -439,12 +439,14 @@ local function execIntent(p, line)
   local a, b = parts[3], parts[4]
   local say = parts[5] or ""
   local thought = parts[6] or ""
+  local goal = parts[7] or ""
   if #say > 0 then pcall(function() p:Say(say) end) end
 
   -- HUD update (transparency)
   HUD.action = (action == "MOVE") and ("MOVE " .. tostring(a) .. "," .. tostring(b)) or action
   HUD.say = say
   if #thought > 0 then HUD.thought = thought end
+  if #goal > 0 then HUD.goal = goal end
   HUD.lastIntentTick = tick
   HUD.seq = seq
 
@@ -748,8 +750,13 @@ function ClaudeHUD:render()
   self:drawRectBorder(0, 0, w, h, 0.7, 0.5, 0.82, 0.72)
   self:drawText("CLAUDE", 12, 8, 0.5, 0.82, 0.72, 1, UIFont.Medium)
   self:drawTextRight(self:statusText(), w - 12, 11, 1, 0.83, 0.28, 1, UIFont.Small)
-  self:drawText("ACTION: " .. HUD.action, 12, 32, 0.9, 0.95, 1, 1, UIFont.Small)
-  local ty = 52
+  if HUD.goal ~= "" then
+    for _, gl in ipairs(self:wrap("GOAL: " .. HUD.goal, 62)) do
+      self:drawText(gl, 12, 28, 1, 0.83, 0.28, 1, UIFont.Small); break  -- one line, amber
+    end
+  end
+  self:drawText("ACTION: " .. HUD.action, 12, 44, 0.9, 0.95, 1, 1, UIFont.Small)
+  local ty = 64
   for _, line in ipairs(self:wrap(HUD.thought, 58)) do
     if ty > 104 then break end
     self:drawText(line, 12, ty, 0.74, 0.79, 0.85, 1, UIFont.Small); ty = ty + 15
