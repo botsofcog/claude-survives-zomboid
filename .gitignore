@@ -1,0 +1,17 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Bridge runtime state (per-run, machine-local)
+bridge/pz-state.json
+*.log
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Scratch
+*.tmp
+scratch/

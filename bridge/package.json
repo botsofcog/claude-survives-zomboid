@@ -1,0 +1,24 @@
+{
+  "name": "claude-survives-zomboid-bridge",
+  "version": "1.0.0",
+  "description": "The brain: reads Project Zomboid perception, asks Claude for a decision, writes back intent, and serves a live mind dashboard.",
+  "type": "module",
+  "main": "pz-bridge.mjs",
+  "scripts": {
+    "start": "node pz-bridge.mjs"
+  },
+  "bin": {
+    "pz-bridge": "pz-bridge.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "project-zomboid",
+    "claude",
+    "llm",
+    "game-ai",
+    "agent"
+  ],
+  "license": "MIT"
+}

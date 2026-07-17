@@ -1,0 +1,3 @@
+name=Claude Survivor
+id=ClaudeSurvivor
+description=Bridges the player character to an external Claude brain (localhost). Perception out via Zomboid/Lua/claude_percept.json, intent in via http://127.0.0.1:8799/pz/intent.

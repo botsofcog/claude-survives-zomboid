@@ -1,0 +1,33 @@
+version=1
+id=
+title=Claude Survives — AI plays the game
+author=Joel
+gameid=108600
+
+description=[h1]Claude Survives[/h1]
+description=An AI actually PLAYS Project Zomboid. It sees the living world, thinks in character, and drives a survivor — looting, fighting, fleeing, hiding — while its live thoughts show on screen.
+description=
+description=[b][u]⚠️ This needs a free companion app to work.[/u][/b] The Workshop item is only the in-game half. The "brain" is a small open-source program you run alongside the game (works with FREE local AI via Ollama, or Claude / GPT / Gemini). One-time setup, ~5 minutes.
+description=
+description=[b]➡ Full setup & downloads:[/b] https://github.com/YOURNAME/claude-survives-zomboid
+description=
+description=[h2]What it does[/h2]
+description=[list]
+description=[*] A real LLM makes every strategic decision from a live feed of the game.
+description=[*] A fast in-game reflex layer handles moment-to-moment survival (fight / flee / dodge / close doors) — because no AI can dodge a zombie in the time it takes to think.
+description=[*] On-screen HUD shows its current action, live inner monologue, vitals, and threats. It speaks its decisions aloud.
+description=[*] Jump in any time with the keyboard; the AI auto-resumes when you stop.
+description=[*] Auto fast-forwards safe travel, snaps to normal near danger.
+description=[/list]
+description=
+description=[h2]Requires[/h2]
+description=[list]
+description=[*] Project Zomboid [b]Build 42[/b]
+description=[*] The free companion "bridge" app (Node.js) + an AI backend — free local Ollama, or a Claude/OpenAI/Gemini key. See the GitHub link.
+description=[/list]
+description=
+description=[i]Single-player. Not affiliated with The Indie Stone or Anthropic. MIT-licensed, contributions welcome on GitHub.[/i]
+
+tags=Build 42
+tags=Misc
+visibility=public
