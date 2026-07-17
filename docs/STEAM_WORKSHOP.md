@@ -7,7 +7,7 @@ the template description already do.
 ## One-time prep
 
 1. Edit `workshop/workshop.txt`:
-   - Replace `https://github.com/YOURNAME/...` with your actual repo URL.
+   - Replace `https://github.com/botsofcog/...` with your actual repo URL.
    - Set `author=` to your name.
    - Leave `id=` blank for a first upload (Steam fills it in and rewrites the file).
 2. Add a **preview image**: put a `preview.png` (512×512 recommended) in `workshop/`. See
