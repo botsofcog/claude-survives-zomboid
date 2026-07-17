@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Survives — an AI that plays Project Zomboid</title>
+<meta name="description" content="An AI that actually plays Project Zomboid — perceiving the living world, reasoning with an LLM, and driving a survivor in real time, with its thoughts on screen.">
+<style>
+  :root{
+    --ground:#0c0f13; --panel:#151b22; --panel-2:#1c2733; --ink:#dde3ea; --muted:#8b99ab;
+    --teal:#7fd1b9; --amber:#ffd479; --blood:#e0554f; --line:#26303a; --line-soft:#1c242d;
+    --shadow:0 18px 50px -20px rgba(0,0,0,.75);
+    --mono:ui-monospace,"Cascadia Code","JetBrains Mono","SF Mono",Menlo,Consolas,monospace;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  @media (prefers-color-scheme: light){
+    :root{
+      --ground:#e7e2d6; --panel:#f2eee4; --panel-2:#ece7db; --ink:#20242b; --muted:#5d6470;
+      --teal:#1f7d66; --amber:#a9791c; --blood:#b23b34; --line:#cdc6b4; --line-soft:#d8d1c1;
+      --shadow:0 14px 40px -22px rgba(40,34,20,.45);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#0c0f13; --panel:#151b22; --panel-2:#1c2733; --ink:#dde3ea; --muted:#8b99ab;
+    --teal:#7fd1b9; --amber:#ffd479; --blood:#e0554f; --line:#26303a; --line-soft:#1c242d;
+    --shadow:0 18px 50px -20px rgba(0,0,0,.75);
+  }
+  :root[data-theme="light"]{
+    --ground:#e7e2d6; --panel:#f2eee4; --panel-2:#ece7db; --ink:#20242b; --muted:#5d6470;
+    --teal:#1f7d66; --amber:#a9791c; --blood:#b23b34; --line:#cdc6b4; --line-soft:#d8d1c1;
+    --shadow:0 14px 40px -22px rgba(40,34,20,.45);
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--ground); color:var(--ink);
+    font-family:var(--sans); line-height:1.6; -webkit-font-smoothing:antialiased;
+    background-image:
+      radial-gradient(1200px 600px at 78% -8%, color-mix(in srgb, var(--teal) 9%, transparent), transparent 60%),
+      radial-gradient(900px 500px at 8% 108%, color-mix(in srgb, var(--blood) 7%, transparent), transparent 60%);
+    background-attachment:fixed;
+  }
+  ::selection{background:color-mix(in srgb, var(--teal) 35%, transparent);}
+  a{color:var(--teal); text-decoration:none}
+  a:hover{text-decoration:underline; text-underline-offset:3px}
+  :focus-visible{outline:2px solid var(--teal); outline-offset:3px; border-radius:2px}
+
+  .wrap{max-width:1080px; margin:0 auto; padding:0 24px}
+  .mono{font-family:var(--mono)}
+  .label{font-family:var(--mono); font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--muted)}
+
+  /* ---- top bar ---- */
+  header.bar{position:sticky; top:0; z-index:30; backdrop-filter:blur(8px);
+    background:color-mix(in srgb, var(--ground) 82%, transparent);
+    border-bottom:1px solid var(--line-soft)}
+  .bar .wrap{display:flex; align-items:center; gap:16px; height:58px}
+  .brand{font-family:var(--mono); font-weight:700; letter-spacing:.02em; display:flex; align-items:center; gap:10px}
+  .brand .dot{width:9px; height:9px; border-radius:50%; background:var(--teal);
+    box-shadow:0 0 0 3px color-mix(in srgb,var(--teal) 22%, transparent); animation:pulse 2.4s infinite}
+  @keyframes pulse{50%{box-shadow:0 0 0 6px transparent}}
+  .bar nav{margin-left:auto; display:flex; gap:22px; align-items:center}
+  .bar nav a{color:var(--muted); font-size:14px}
+  .bar nav a:hover{color:var(--ink); text-decoration:none}
+  .btn{font-family:var(--mono); font-size:13px; font-weight:600; padding:9px 16px; border-radius:3px;
+    border:1px solid var(--teal); color:var(--ground); background:var(--teal); cursor:pointer; display:inline-flex; gap:8px; align-items:center}
+  .btn:hover{text-decoration:none; filter:brightness(1.08)}
+  .btn.ghost{background:transparent; color:var(--teal)}
+  .btn.ghost:hover{background:color-mix(in srgb,var(--teal) 12%, transparent)}
+  .theme-toggle{font-family:var(--mono); font-size:12px; color:var(--muted); background:none; border:1px solid var(--line); border-radius:3px; padding:6px 9px; cursor:pointer}
+  .theme-toggle:hover{color:var(--ink); border-color:var(--muted)}
+
+  /* ---- hero ---- */
+  .hero{padding:72px 0 56px; display:grid; grid-template-columns:1.05fr .95fr; gap:48px; align-items:center}
+  .eyebrow{display:inline-flex; align-items:center; gap:8px; margin-bottom:20px}
+  .eyebrow .tick{color:var(--teal)}
+  h1{font-family:var(--mono); font-weight:800; font-size:clamp(2.3rem,5.2vw,3.7rem); line-height:1.02;
+    letter-spacing:-.01em; margin:0 0 18px; text-wrap:balance}
+  h1 .fade{color:var(--muted)}
+  .lede{font-size:1.12rem; color:color-mix(in srgb,var(--ink) 88%, var(--muted)); max-width:34em; margin:0 0 26px}
+  .hero-cta{display:flex; gap:12px; flex-wrap:wrap; align-items:center}
+  .hero-note{font-family:var(--mono); font-size:12px; color:var(--muted); margin-top:18px}
+  .hero-note b{color:var(--amber); font-weight:600}
+
+  /* ---- HUD replica ---- */
+  .hud{background:linear-gradient(180deg,var(--panel),var(--panel-2)); border:1px solid var(--line);
+    border-radius:6px; box-shadow:var(--shadow); overflow:hidden; position:relative}
+  .hud::before{content:""; position:absolute; inset:0; pointer-events:none; opacity:.5;
+    background:repeating-linear-gradient(0deg, transparent 0 3px, color-mix(in srgb,var(--ground) 40%, transparent) 3px 4px)}
+  .hud-top{display:flex; align-items:center; justify-content:space-between; padding:12px 16px; border-bottom:1px solid var(--line-soft)}
+  .hud-top .name{font-family:var(--mono); font-weight:700; color:var(--teal); letter-spacing:.04em}
+  .status{font-family:var(--mono); font-size:11px; color:var(--amber); border:1px solid color-mix(in srgb,var(--amber) 40%,transparent); padding:3px 8px; border-radius:100px}
+  .hud-body{padding:16px}
+  .hud-action{font-family:var(--mono); font-size:13px; color:var(--ink); margin-bottom:10px}
+  .hud-action .k{color:var(--muted)}
+  .thought{min-height:3.4em; font-size:15px; color:color-mix(in srgb,var(--ink) 82%,var(--muted)); margin:0 0 4px}
+  .cursor{display:inline-block; width:8px; height:1.05em; vertical-align:-2px; background:var(--teal); margin-left:2px; animation:blink 1.05s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  .say{font-family:var(--mono); font-size:13px; color:var(--amber); min-height:1.5em; margin-bottom:16px}
+  .say:empty{margin-bottom:0}
+  .bars{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:14px}
+  .stat .label{font-size:9px}
+  .meter{height:6px; border-radius:3px; background:color-mix(in srgb,var(--ground) 55%,var(--panel)); margin-top:5px; overflow:hidden}
+  .meter i{display:block; height:100%; background:var(--teal)}
+  .meter.warn i{background:var(--blood)}
+  .hud-foot{display:flex; justify-content:space-between; gap:12px; font-family:var(--mono); font-size:11px; color:var(--muted); border-top:1px solid var(--line-soft); padding-top:12px}
+  .hud-foot .zed{color:var(--blood)}
+
+  /* ---- sections ---- */
+  section{padding:64px 0; border-top:1px solid var(--line-soft)}
+  .sec-head{max-width:60ch; margin-bottom:36px}
+  h2{font-family:var(--mono); font-weight:700; font-size:clamp(1.5rem,3vw,2rem); letter-spacing:-.01em; margin:.4rem 0 .5rem; text-wrap:balance}
+  .sec-head p{color:var(--muted); margin:0}
+
+  /* two-layer architecture */
+  .layers{display:grid; gap:16px}
+  .layer{border:1px solid var(--line); border-radius:5px; background:var(--panel); padding:22px 24px; position:relative; overflow:hidden}
+  .layer .corner{position:absolute; top:0; right:0; font-family:var(--mono); font-size:10px; letter-spacing:.15em; color:var(--muted); padding:6px 10px; border-left:1px solid var(--line-soft); border-bottom:1px solid var(--line-soft); border-bottom-left-radius:4px}
+  .layer h3{font-family:var(--mono); margin:0 0 6px; font-size:1.15rem}
+  .layer.brain h3{color:var(--amber)} .layer.reflex h3{color:var(--teal)}
+  .layer p{margin:0; color:color-mix(in srgb,var(--ink) 80%,var(--muted)); max-width:60ch}
+  .layer .speed{font-family:var(--mono); font-size:12px; color:var(--muted); margin-top:10px}
+  .layer .speed b{color:var(--ink); font-weight:600}
+  .arrow{text-align:center; font-family:var(--mono); color:var(--muted); font-size:13px; letter-spacing:.1em}
+
+  /* features */
+  .grid{display:grid; grid-template-columns:repeat(3,1fr); gap:14px}
+  .card{border:1px solid var(--line); background:var(--panel); border-radius:5px; padding:20px; position:relative}
+  .card::after{content:""; position:absolute; top:9px; right:9px; width:7px; height:7px; border-top:1px solid var(--teal); border-right:1px solid var(--teal); opacity:.6}
+  .card h3{font-family:var(--mono); font-size:1rem; margin:0 0 7px; color:var(--ink)}
+  .card p{margin:0; font-size:.92rem; color:var(--muted)}
+
+  /* backends */
+  .chips{display:flex; flex-wrap:wrap; gap:10px; margin-top:6px}
+  .chip{font-family:var(--mono); font-size:13px; border:1px solid var(--line); border-radius:100px; padding:8px 15px; background:var(--panel); display:flex; align-items:center; gap:8px}
+  .chip .free{color:var(--teal); font-size:10px; letter-spacing:.1em}
+  .chip b{font-weight:600}
+
+  /* quickstart */
+  .steps{display:grid; grid-template-columns:repeat(3,1fr); gap:16px; counter-reset:s}
+  .step{border:1px solid var(--line); border-radius:5px; background:var(--panel); padding:22px}
+  .step::before{counter-increment:s; content:counter(s,decimal-leading-zero); font-family:var(--mono); font-size:12px; color:var(--teal); letter-spacing:.1em}
+  .step h3{font-family:var(--mono); font-size:1rem; margin:8px 0 8px}
+  .step p{margin:0; font-size:.92rem; color:var(--muted)}
+  pre{font-family:var(--mono); font-size:12.5px; background:var(--ground); border:1px solid var(--line); border-radius:4px; padding:10px 12px; overflow-x:auto; margin:10px 0 0; color:var(--ink)}
+  pre .c{color:var(--muted)}
+  code{font-family:var(--mono); font-size:.88em; background:color-mix(in srgb,var(--panel) 70%,transparent); padding:1px 5px; border-radius:3px; border:1px solid var(--line-soft)}
+
+  /* roadmap */
+  .road{display:grid; grid-template-columns:1fr 1fr; gap:10px 28px}
+  .road .row{display:flex; gap:12px; align-items:baseline; padding:9px 0; border-bottom:1px solid var(--line-soft)}
+  .road .tag{font-family:var(--mono); font-size:10px; letter-spacing:.12em; padding:2px 7px; border-radius:3px; white-space:nowrap}
+  .tag.done{color:var(--teal); border:1px solid color-mix(in srgb,var(--teal) 40%,transparent)}
+  .tag.next{color:var(--amber); border:1px solid color-mix(in srgb,var(--amber) 40%,transparent)}
+  .road .row span{color:var(--muted); font-size:.92rem}
+
+  .callout{border:1px solid color-mix(in srgb,var(--blood) 45%,var(--line)); background:color-mix(in srgb,var(--blood) 7%,var(--panel)); border-radius:5px; padding:18px 20px; font-size:.95rem}
+  .callout b{color:var(--blood)}
+
+  footer{border-top:1px solid var(--line-soft); padding:40px 0 60px; color:var(--muted); font-size:.9rem}
+  footer .wrap{display:flex; flex-wrap:wrap; gap:16px; align-items:center; justify-content:space-between}
+  footer .mono{font-size:12px}
+
+  @media (max-width:820px){
+    .hero{grid-template-columns:1fr; gap:34px; padding:48px 0 40px}
+    .grid,.steps{grid-template-columns:1fr}
+    .road{grid-template-columns:1fr}
+    .bars{grid-template-columns:repeat(4,1fr)}
+    .bar nav a:not(.btn){display:none}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none !important; transition:none !important; scroll-behavior:auto}
+  }
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="wrap">
+    <span class="brand"><span class="dot"></span>Claude&nbsp;Survives</span>
+    <nav>
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#backends">AI backends</a>
+      <a href="#start">Get started</a>
+      <button class="theme-toggle" id="themeBtn" aria-label="Toggle light and dark">◐ theme</button>
+      <a class="btn" href="https://github.com/YOURNAME/claude-survives-zomboid">GitHub ↗</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- HERO -->
+  <section class="hero" style="border-top:none">
+    <div>
+      <span class="eyebrow label"><span class="tick">◤</span> Project Zomboid · Build 42 · single-player</span>
+      <h1>An AI that actually<br><span class="fade">plays the</span> apocalypse.</h1>
+      <p class="lede">Hand a Project Zomboid survivor to a large language model. It sees the living world, thinks in character, and drives the body — looting, fighting, fleeing, hiding — while its every thought shows on screen. Not a scripted bot. A mind, improvising, one decision at a time.</p>
+      <div class="hero-cta">
+        <a class="btn" href="#start">Run it yourself</a>
+        <a class="btn ghost" href="#how">See how it works</a>
+      </div>
+      <p class="hero-note">Watch it live at <b>localhost:8799/mind</b> — or right here in the panel. →</p>
+    </div>
+
+    <!-- live HUD replica -->
+    <div class="hud" aria-label="Live replica of the in-game AI heads-up display">
+      <div class="hud-top">
+        <span class="name">CLAUDE</span>
+        <span class="status" id="status">NEW PLAN</span>
+      </div>
+      <div class="hud-body">
+        <div class="hud-action"><span class="k">ACTION:</span> <span id="action">MOVE -25, 25</span></div>
+        <p class="thought"><span id="thought">Okay. Kentucky. Zombies. Crisps and a hammer.</span><span class="cursor"></span></p>
+        <div class="say" id="say">“Could be worse — could be raining.”</div>
+        <div class="bars">
+          <div class="stat"><span class="label">HP</span><div class="meter"><i style="width:100%"></i></div></div>
+          <div class="stat"><span class="label">Hunger</span><div class="meter"><i style="width:22%"></i></div></div>
+          <div class="stat"><span class="label">Thirst</span><div class="meter"><i style="width:18%"></i></div></div>
+          <div class="stat"><span class="label">Fatigue</span><div class="meter warn"><i style="width:74%"></i></div></div>
+        </div>
+        <div class="hud-foot">
+          <span class="zed">zombies · 8 near / 0 close</span>
+          <span>day 0 · 09:00 · [H hides]</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section id="how">
+    <div class="sec-head">
+      <span class="label">The core idea</span>
+      <h2>A slow brain and a fast reflex, working together.</h2>
+      <p>Project Zomboid is real-time — a zombie kills you in the second it takes to reach you, and an LLM takes several seconds to answer. So control is split across two layers running at two very different speeds.</p>
+    </div>
+    <div class="layers">
+      <div class="layer brain">
+        <span class="corner">EVERY ~5s</span>
+        <h3>The Brain — strategy</h3>
+        <p>An LLM reads a live feed of the world and decides intent: where to go, what to loot, when to hide, what it's feeling. It never micromanages a fight — it decides <em>“clear that house, then hole up,”</em> and hands off.</p>
+        <div class="speed">latency: <b>seconds</b> · runs in the companion bridge</div>
+      </div>
+      <div class="arrow">▽ &nbsp; intent &nbsp; ▽</div>
+      <div class="layer reflex">
+        <span class="corner">EVERY FEW TICKS</span>
+        <h3>The Reflex — survival</h3>
+        <p>Deterministic Lua running on the game's own clock. It reacts the same tick a threat appears: flee a swarm along a repulsion vector, stand and fight a lone attacker, close doors, dodge — no round-trip to the brain.</p>
+        <div class="speed">latency: <b>instant</b> · runs inside the game</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section id="features">
+    <div class="sec-head">
+      <span class="label">What it does</span>
+      <h2>Everything it perceives and decides, on screen.</h2>
+      <p>Transparency is the point — you watch a mind survive, you don't just watch a character move.</p>
+    </div>
+    <div class="grid">
+      <div class="card"><h3>Real LLM control</h3><p>Every strategic choice is genuinely reasoned turn by turn from the live game state — not a decision tree.</p></div>
+      <div class="card"><h3>Fight or flee</h3><p>Armed and not overwhelmed, it closes in and swings. Unarmed, swarmed, or hurt, it breaks away. Decided locally, instantly.</p></div>
+      <div class="card"><h3>Live inner monologue</h3><p>An in-game HUD shows its current action, first-person thoughts, vitals and threats. It speaks decisions aloud.</p></div>
+      <div class="card"><h3>Loot · conceal · break in</h3><p>Grabs food, water and weapons (and says what it took), closes doors and curtains to hide, smashes windows into locked buildings.</p></div>
+      <div class="card"><h3>You can take over</h3><p>Grab the keyboard any time to save it; the AI stands down and auto-resumes ten seconds after you stop.</p></div>
+      <div class="card"><h3>Smart game-speed</h3><p>Auto fast-forwards safe travel, snaps to normal near danger, and can pause for a beat when things get truly dire.</p></div>
+    </div>
+  </section>
+
+  <!-- BACKENDS -->
+  <section id="backends">
+    <div class="sec-head">
+      <span class="label">Bring your own AI</span>
+      <h2>Runs on any model — free local, or hosted.</h2>
+      <p>The brain is backend-agnostic. Point it at a free local model, or any major provider. It auto-detects from whatever key you set.</p>
+    </div>
+    <div class="chips">
+      <span class="chip"><b>Ollama</b> <span class="free">FREE · LOCAL</span></span>
+      <span class="chip"><b>Anthropic</b> Claude</span>
+      <span class="chip"><b>OpenAI</b> GPT</span>
+      <span class="chip"><b>Google</b> Gemini</span>
+      <span class="chip"><b>OpenRouter</b> · Groq · Together</span>
+      <span class="chip"><b>Claude CLI</b> subscription</span>
+    </div>
+    <pre style="margin-top:22px"><span class="c"># free &amp; local — no API key, runs offline</span>
+PZ_BACKEND=ollama PZ_MODEL=llama3.1 node pz-bridge.mjs</pre>
+  </section>
+
+  <!-- QUICKSTART -->
+  <section id="start">
+    <div class="sec-head">
+      <span class="label">Get started</span>
+      <h2>Three steps, about five minutes.</h2>
+      <p>You need Project Zomboid (Build 42), Node.js 18+, and one AI backend from above.</p>
+    </div>
+    <div class="steps">
+      <div class="step">
+        <h3>Install the mod</h3>
+        <p>Drop <code>mods/ClaudeSurvivor</code> into your Zomboid mods folder (or run the helper).</p>
+        <pre>pwsh ./install.ps1</pre>
+      </div>
+      <div class="step">
+        <h3>Start the brain</h3>
+        <p>Launch the bridge with your chosen backend. It serves the live dashboard.</p>
+        <pre>cd bridge
+node pz-bridge.mjs</pre>
+      </div>
+      <div class="step">
+        <h3>Let go</h3>
+        <p>Enable <b>Claude Survivor</b> in-game, start a Sandbox run, and take your hands off the keyboard.</p>
+        <pre><span class="c"># then just watch:</span>
+localhost:8799/mind</pre>
+      </div>
+    </div>
+    <div class="callout" style="margin-top:22px">
+      <b>Fair warning:</b> most runs end badly. It's a zombie apocalypse, survival quality is a work in progress, and that's the fun — every run is a different improvised story. Jump in when you can't watch it die.
+    </div>
+  </section>
+
+  <!-- ROADMAP -->
+  <section>
+    <div class="sec-head">
+      <span class="label">Status</span>
+      <h2>Working today — and where it's going.</h2>
+      <p>An active, iterative project. Survival quality is the frontier, tuned by watching runs and fixing whatever looks wrong next. Contributions welcome.</p>
+    </div>
+    <div class="road">
+      <div class="row"><span class="tag done">LIVE</span><span>LLM strategy + reflex fight/flee</span></div>
+      <div class="row"><span class="tag next">NEXT</span><span>Pathability-aware movement</span></div>
+      <div class="row"><span class="tag done">LIVE</span><span>Loot, conceal, break-in, night lights</span></div>
+      <div class="row"><span class="tag next">NEXT</span><span>Selectable combat styles (kite vs. stand)</span></div>
+      <div class="row"><span class="tag done">LIVE</span><span>Human override + panic pause</span></div>
+      <div class="row"><span class="tag next">NEXT</span><span>Bandage crafting &amp; healing</span></div>
+      <div class="row"><span class="tag done">LIVE</span><span>Auto game-speed + full HUD transparency</span></div>
+      <div class="row"><span class="tag next">NEXT</span><span>Line-of-sight cover &amp; barricading</span></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span class="mono">MIT · not affiliated with The Indie Stone or Anthropic</span>
+    <span style="display:flex; gap:18px">
+      <a href="https://github.com/YOURNAME/claude-survives-zomboid">GitHub</a>
+      <a href="https://steamcommunity.com/app/108600/workshop/">Steam Workshop</a>
+      <a href="#start">Get started</a>
+    </span>
+  </div>
+</footer>
+
+<script>
+  // theme toggle — stamps data-theme so it wins over the media query in both directions
+  const root = document.documentElement, btn = document.getElementById('themeBtn');
+  btn.addEventListener('click', () => {
+    const cur = root.getAttribute('data-theme')
+      || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    root.setAttribute('data-theme', cur === 'dark' ? 'light' : 'dark');
+  });
+
+  // cycle real thoughts from actual runs through the HUD
+  const beats = [
+    {status:'NEW PLAN', action:'MOVE -25, 25', thought:'Okay. Kentucky. Zombies. Crisps and a hammer.', say:'“Could be worse — could be raining.”'},
+    {status:'ACTING',   action:'MOVE 10, -35', thought:"Fourteen of them in earshot. Drifting southwest before dark.", say:'“Nope, that way leads to a committee. North it is.”'},
+    {status:'REFLEX',   action:'FLEE (reflex)', thought:'Too close — breaking away to open the gap.', say:'“!”'},
+    {status:'ACTING',   action:'ENGAGING',      thought:'One ahead — closing in to take it down.', say:''},
+    {status:'REFLEX',   action:'FIGHT',         thought:'On it — swing and drop this one.', say:''},
+    {status:'NEW PLAN', action:'LOOT',          thought:'Grabbed: Hammer, Canned Beans, Water Bottle.', say:'“Right. Now somewhere with a door that locks.”'},
+    {status:'thinking...', action:'CONCEAL',    thought:"Curtains drawn, door shut. Let the night pass.", say:''},
+  ];
+  const $ = id => document.getElementById(id);
+  let i = 0;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function show(b){
+    $('status').textContent = b.status;
+    $('action').textContent = b.action;
+    $('thought').textContent = b.thought;
+    $('say').textContent = b.say;
+  }
+  if(!reduce){
+    setInterval(() => { i = (i+1) % beats.length; show(beats[i]); }, 3600);
+  }
+</script>
+</body>
+</html>
