@@ -1,0 +1,63 @@
+============================================================
+ STEAM WORKSHOP LISTING — copy/paste this when you publish
+============================================================
+
+------------------------------------------------------------
+TITLE  (paste into the "Title" field)
+------------------------------------------------------------
+Claude Survives — an AI actually plays (companion app required)
+
+
+------------------------------------------------------------
+TAGS  (tick these in the Workshop uploader / edit page)
+------------------------------------------------------------
+Build 42
+Misc
+
+
+------------------------------------------------------------
+PREVIEW IMAGE
+------------------------------------------------------------
+Use  workshop/preview.png  (already in this folder).
+After uploading, also add a couple of in-game screenshots via the
+Workshop "Add/Edit Images" page — a gameplay shot with the HUD, and
+one of the /mind dashboard, both help a lot.
+
+
+------------------------------------------------------------
+DESCRIPTION  (paste into the "Description" box — Steam BBCode)
+------------------------------------------------------------
+[h1]Claude Survives[/h1]
+An AI actually [b]plays[/b] Project Zomboid. It sees the living world, thinks in character, and drives a survivor — looting, fighting, fleeing, hiding, breaking into houses — while its live thoughts show right on screen. Not a scripted bot: the strategy is genuinely reasoned, one decision at a time. Most runs end badly. That's the fun.
+
+[h3]⚠️ Please read: this needs a small free companion app[/h3]
+The Workshop item is only the [i]in-game half[/i]. The "brain" is a tiny open-source program you run alongside the game. It's a one-time ~5 minute setup, and it works with [b]completely free local AI[/b] (Ollama) — or your own Claude / OpenAI / Gemini key if you prefer.
+
+[b]➡ Setup + download (start here):[/b] [url=https://github.com/botsofcog/claude-survives-zomboid]github.com/botsofcog/claude-survives-zomboid[/url]
+
+[h2]What it does[/h2]
+[list]
+[*] [b]Real LLM control[/b] — every strategic call (where to go, what to loot, when to hide) is reasoned live from the game state.
+[*] [b]Fast survival reflex[/b] — split-second fight-or-flee runs inside the game, because no AI can dodge a lunging zombie in the time it takes to think.
+[*] [b]It works toward goals[/b] — holds an overarching objective ("arm up and secure a defensible house with food") and breaks it into adaptive subtasks.
+[*] [b]Full transparency[/b] — an on-screen HUD shows its current action, live inner monologue, goal, vitals and threats. It speaks its decisions out loud.
+[*] [b]Talk to it[/b] — a two-way "voice from beyond" chat: message the survivor and it answers, in character.
+[*] [b]Jump in anytime[/b] — grab the keyboard to save it; the AI stands down and auto-resumes when you stop.
+[*] [b]Loot, conceal, break in, night lights, sneak, auto fast-forward[/b] — the basics of staying alive.
+[/list]
+
+[h2]Requires[/h2]
+[list]
+[*] Project Zomboid [b]Build 42[/b]
+[*] The free companion "bridge" app ([url=https://nodejs.org/]Node.js[/url]) + an AI backend — free local [url=https://ollama.com/]Ollama[/url], or a Claude / OpenAI / Gemini key. Full guide at the GitHub link.
+[/list]
+
+[h2]How to use[/h2]
+[olist]
+[*] Subscribe here, and grab the companion app from the GitHub link above.
+[*] Start the bridge with your chosen AI (free Ollama works great).
+[*] Enable [b]Claude Survivor[/b] in the in-game Mods menu, start a Sandbox game, and take your hands off the keyboard.
+[*] Watch it live in-game and at localhost:8799/mind.
+[/olist]
+
+[i]Single-player. Open-source (MIT) — issues and contributions welcome on GitHub. Not affiliated with or endorsed by The Indie Stone or Anthropic.[/i]
