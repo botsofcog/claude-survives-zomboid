@@ -458,7 +458,7 @@ local function execIntent(p, line)
     if (tick - lastLootTick < 400) and qlen > 0 and not (nd >= 0 and nd < 8) then
       HUD.thought = "Finishing the grab first."
     -- anti-ping-pong: while we just fled, ignore a brain move heading BACK toward the zombie.
-    elseif nd >= 0 and nd < 18 and (tick - reflexTick < 200)
+    elseif nd >= 0 and nd < 12 and (tick - reflexTick < 90)
        and ((tonumber(a) or 0) * ndx + (tonumber(b) or 0) * ndy) > 0 then
       HUD.thought = "Not yet — that's back toward them. Opening the gap first."
     else
@@ -490,8 +490,8 @@ end
 -- Sum a repulsion vector AWAY from every zombie within range (closer = stronger), so we flee
 -- along the safest heading instead of blindly away from just the nearest one (which could be
 -- straight into two others). This is what keeps him alive between slow LLM decisions.
-local FLEE_TRIGGER   = 12   -- idle + a zombie this close -> start moving away
-local FLEE_INTERRUPT = 6    -- this close -> interrupt whatever he's doing and bolt
+local FLEE_TRIGGER   = 8    -- flee only when a threat is genuinely close (was 12 — too jumpy)
+local FLEE_INTERRUPT = 4    -- interrupt a task only when one's basically on him
 
 local function fleeVector(px, py)
   local fx, fy, nearestD, danger = 0, 0, 9999, 0
@@ -566,25 +566,31 @@ local function reflex(p)
   if emergency then pcall(function() p:Say("!") end) end
   HUD.action = "FLEE (reflex)"
   HUD.thought = "Too close — breaking away to open the gap."
-  doMove(p, math.floor(fx / len * 30 + 0.5), math.floor(fy / len * 30 + 0.5))
+  doMove(p, math.floor(fx / len * 16 + 0.5), math.floor(fy / len * 16 + 0.5))  -- short, controlled break
 end
 
 -- Fight-or-flee: FIGHT when armed, not swarmed, and healthy enough. Only FLEE when he'd actually
 -- lose — unarmed, outnumbered (3+ close), or badly hurt. Returns true if it took over.
 local function survive(p)
   local px, py = p:getX(), p:getY()
-  local z, nd = nearestZombie(px, py, 14)
-  if not z or nd > 14 then return false end          -- nothing near -> let the brain drive
-  local _, _, swarm = nearestZombie(px, py, 8)        -- how many are right around us
+  local z, nd = nearestZombie(px, py, 11)             -- only engage/flee range; farther = brain's job
+  if not z or nd > 11 then return false end           -- nothing close -> let the brain pursue its goal
+  local _, _, swarm = nearestZombie(px, py, 7)        -- how many are right around us
   local armed, hp = false, 100
   pcall(function() armed = p:getPrimaryHandItem() ~= nil end)
   pcall(function() hp = p:getBodyDamage():getOverallBodyHealth() end)
-  if armed and swarm <= 2 and hp >= 35 then           -- winnable -> stand and fight
+  local cornered = nd <= FLEE_INTERRUPT and (swarm >= 2 or not armed)
+  -- STAND AND FIGHT is the default when he can win — don't let a lone zombie scare him off task.
+  if armed and hp >= 30 and swarm <= 2 and not cornered then
     engage(p, z, nd)
-  else                                                -- unarmed / swarmed / hurt -> break away
-    reflex(p)
+    return true
   end
-  return true
+  -- FLEE only when he'd actually lose: unarmed & close, swarmed, badly hurt, or cornered.
+  if (not armed and nd <= FLEE_TRIGGER) or swarm >= 3 or (hp < 30 and nd <= FLEE_TRIGGER) or cornered then
+    reflex(p)
+    return true
+  end
+  return false                                        -- otherwise keep pursuing the objective
 end
 
 -- auto game-speed: fast-forward the boring safe stretches, snap to normal near danger so the
