@@ -20,6 +20,7 @@ local lastSeq    = 0
 local lastError  = ""
 local announced  = false
 local reflexTick = -99999
+local lastLootTick = -99999   -- protects an in-progress loot from being interrupted
 local travel     = { active = false, dx = 0, dy = 0, budget = 0 }  -- momentum
 
 -- human override: you can grab the keyboard to help; the AI stands down and auto-resumes
@@ -305,6 +306,7 @@ local function doLoot(p)
     end
   end
   if not best then lastError = "loot: no stocked container within 10 tiles"; return end
+  lastLootTick = tick                       -- protect this loot from interruption (see MOVE handler)
   ISTimedActionQueue.clear(p)
   if not pcall(function() luautils.walkAdj(p, bestSq) end) then ISTimedActionQueue.add(ISWalkToTimedAction:new(p, bestSq)) end
   local taken, citems, names = 0, best:getItems(), {}
@@ -325,10 +327,12 @@ local function doLoot(p)
   if taken == 0 then
     lastError = "loot: nothing takeable"
   else
+    -- honest wording: he's IN THE ACT of taking these (transfers are queued and protected from
+    -- interruption), so say "Grabbing" not "Grabbed" — the words match what's actually happening.
     local summary = table.concat(names, ", ")
     HUD.action = "LOOT"
-    HUD.thought = "Grabbed: " .. summary
-    pcall(function() p:Say("Grabbed " .. summary) end)   -- announce the haul
+    HUD.thought = "Grabbing: " .. summary
+    pcall(function() p:Say("Grabbing " .. summary) end)
   end
 end
 
@@ -445,11 +449,16 @@ local function execIntent(p, line)
   HUD.seq = seq
 
   if action == "MOVE" then
-    -- anti-ping-pong: while we just fled, ignore a brain move that heads BACK toward the zombie
-    -- we're escaping (otherwise "go loot that building" yanks him into the horde he just left).
     local px2, py2 = p:getX(), p:getY()
+    local qlen = 0
+    pcall(function() local q = ISTimedActionQueue.getTimedActionQueue(p); if q and q.queue then qlen = #q.queue end end)
     local _, _, _, nd, _, ndx, ndy = zombieScan(px2, py2)
-    if nd >= 0 and nd < 18 and (tick - reflexTick < 200)
+    -- don't interrupt an in-progress loot: let the item transfers finish so he actually gets what
+    -- he said he's grabbing (unless a zombie is right on him — survival wins).
+    if (tick - lastLootTick < 400) and qlen > 0 and not (nd >= 0 and nd < 8) then
+      HUD.thought = "Finishing the grab first."
+    -- anti-ping-pong: while we just fled, ignore a brain move heading BACK toward the zombie.
+    elseif nd >= 0 and nd < 18 and (tick - reflexTick < 200)
        and ((tonumber(a) or 0) * ndx + (tonumber(b) or 0) * ndy) > 0 then
       HUD.thought = "Not yet — that's back toward them. Opening the gap first."
     else

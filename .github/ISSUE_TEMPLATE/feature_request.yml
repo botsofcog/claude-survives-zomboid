@@ -1,0 +1,22 @@
+name: Feature / behavior idea
+description: A survival skill, tactic, or capability the AI should have
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What should the survivor be able to do, and when?
+      placeholder: "It should craft bandages by ripping clothing when it's bleeding…"
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it matters
+      description: What goes wrong today without it?
+  - type: textarea
+    id: notes
+    attributes:
+      label: Implementation notes (optional)
+      description: Relevant PZ Lua APIs, reference mods, or where it fits (brain prompt vs. reflex layer).

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Setup help & troubleshooting
+    url: https://github.com/botsofcog/claude-survives-zomboid/blob/main/docs/SETUP.md
+    about: Read the setup and troubleshooting guide first — it covers the common issues.
+  - name: How it works (architecture)
+    url: https://github.com/botsofcog/claude-survives-zomboid/blob/main/docs/ARCHITECTURE.md
+    about: The brain/reflex split, the file bridge, and why it's built this way.

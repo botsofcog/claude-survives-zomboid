@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  bridge:
+    name: Bridge (Node) syntax + JSON
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax-check the bridge
+        run: |
+          node --check bridge/pz-bridge.mjs
+          node --check bridge/llm.mjs
+      - name: Validate package.json
+        run: node -e "JSON.parse(require('fs').readFileSync('bridge/package.json','utf8'))"
+
+  mod:
+    name: Mod (Lua) sanity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install luac
+        run: sudo apt-get update && sudo apt-get install -y lua5.1
+      - name: Lua parse check (Kahlua is 5.1-compatible)
+        run: |
+          for f in $(find mods -name '*.lua'); do
+            echo "checking $f"
+            luac5.1 -p "$f"
+          done
+      - name: mod.info present at root and version folder
+        run: |
+          test -f mods/ClaudeSurvivor/mod.info
+          test -f mods/ClaudeSurvivor/42/mod.info

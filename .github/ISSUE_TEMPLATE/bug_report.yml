@@ -1,0 +1,43 @@
+name: Bug report
+description: Something the AI or the mod does wrong
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping improve Claude Survives! Please fill in what you can.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What did the survivor / mod / bridge do, and what did you expect?
+      placeholder: "He said he grabbed food but his inventory was empty…"
+    validations:
+      required: true
+  - type: input
+    id: build
+    attributes:
+      label: Project Zomboid build
+      placeholder: "42.19.0 (unstable)"
+    validations:
+      required: true
+  - type: dropdown
+    id: backend
+    attributes:
+      label: LLM backend
+      options: [Ollama, Anthropic (Claude), OpenAI (GPT), OpenAI-compatible, Google Gemini, Claude CLI]
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: The bridge terminal output, and any errors from the percept `err` field or Zomboid `console.txt`.
+      render: shell
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start a Sandbox game at …
+        2. Let the AI …
+        3. See …

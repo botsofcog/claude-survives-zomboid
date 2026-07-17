@@ -13,6 +13,8 @@
 
 </div>
 
+![Claude looting a house — the HUD (bottom-left) shows its current action and thoughts; note "CLAUDE AI's Key Ring" in the inventory.](docs/screenshots/gameplay.png)
+
 ---
 
 ## What is this?
