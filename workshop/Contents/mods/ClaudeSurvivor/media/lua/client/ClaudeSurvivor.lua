@@ -639,34 +639,11 @@ local function onTick()
     end
   end
 
-  -- PANIC PAUSE (sparingly): while paused, keep senses + intent flowing so the brain plans
-  -- during the freeze, then auto-unpause. Any key press cancels it (handled in the key hook).
-  if panicUntilTick > 0 then
-    if tick >= panicUntilTick then
-      pcall(function() setGameSpeed(1) end); panicUntilTick = -1
-    else
-      HUD.action = "PAUSED — dire moment (jump in!)"
-      if tick % 12 == 0 then writePercept(p); pollIntent(p) end
-      return
-    end
-  end
-
-  -- SURVIVAL first, every ~5 ticks (fight/flee locally — the brain is too slow for this)
+  -- SURVIVAL first, every ~5 ticks (fight/flee locally — the brain is too slow for this).
+  -- NOTE: no auto game-pause — PZ halts OnTick at speed 0 so the mod could never un-pause itself
+  -- (it froze the game). The flee reflex handles dire moments instead; pause manually if you want.
   local acted = false
   if tick % 5 == 0 then pcall(function() acted = survive(p) end) end
-
-  -- trigger a panic pause only in a genuinely dire spot, and rarely (long cooldown)
-  if (tick - lastPanicTick) > PANIC_COOLDOWN then
-    local _, nd6, swarm6 = nearestZombie(px, py, 6)
-    local hp = 100
-    pcall(function() hp = p:getBodyDamage():getOverallBodyHealth() end)
-    if swarm6 >= 3 or (hp < 25 and nd6 >= 0 and nd6 <= 3) then
-      lastPanicTick = tick; panicUntilTick = tick + PANIC_LEN
-      pcall(function() p:Say("Too many — think!") end)
-      pcall(function() setGameSpeed(0) end)
-      return
-    end
-  end
 
   -- CROUCH/SNEAK to avoid drawing zombies when they're around but we're not mid-flee; stand tall
   -- (no sneak) while actively escaping so we move at full speed.

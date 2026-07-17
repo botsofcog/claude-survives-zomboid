@@ -34,6 +34,7 @@ function writeIntentFile(line) {
 let state = {
   seq: 0, memory: '(fresh mind — nothing yet)', log: [], deaths: 0,
   goal: '', subtask: '',   // the overarching goal it holds to, and the current step toward it
+  chat: [],                // two-way GOD channel: {from:'god'|'claude', text, t}
 };
 try { state = { ...state, ...JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) }; } catch {}
 const saveState = () => { try { fs.writeFileSync(STATE_FILE, JSON.stringify({ ...state, log: state.log.slice(-200) })); } catch {} };
@@ -117,8 +118,11 @@ GOALS — you work toward ONE overarching goal, broken into subtasks:
 - ADAPT the subtask to what's in front of you (a threat, a locked door, an empty house) — but the adaptation should still serve the major goal. Don't wander off it. If danger interrupts you, deal with it, then RETURN to the goal.
 - If you have no goal yet (first turns), set a sensible survival goal and its first subtask.
 
+THE VOICE FROM BEYOND: sometimes a voice speaks to you that no one else can hear — a presence watching over you, guiding you. When it speaks, answer it in your "reply" field (first person, out loud, like talking to yourself or a god), and take its guidance seriously — it's trying to keep you alive. Weave what it says into your goal/action. When it's silent, "reply" is "".
+
 Reply STRICT JSON only, no prose outside it:
-{"goal":"your overarching major goal — usually unchanged from last turn; a full sentence",
+{"reply":"if the VOICE FROM BEYOND spoke this turn, what you say back to it out loud (first person, <=120 chars); otherwise \\"\\"",
+ "goal":"your overarching major goal — usually unchanged from last turn; a full sentence",
  "subtask":"the concrete step you're on right now toward the goal, a short phrase",
  "thought":"inner monologue, FIRST PERSON, ONE short punchy sentence under ~100 chars — never third person",
  "say":"words you speak ALOUD, first person, <=90 chars, or \\"\\" if silent — NOT narration",
@@ -170,7 +174,15 @@ Advance your subtask toward your goal. STRICT JSON only.`;
     const type = ['MOVE', 'LOOT', 'EAT', 'DRINK', 'EQUIP', 'CLOSEDOOR', 'CONCEAL', 'BREAKIN', 'STOP', 'WAIT'].includes(a.type) ? a.type : 'WAIT';
     const dx = Math.max(-40, Math.min(40, Math.round(Number(a.dx) || 0)));
     const dy = Math.max(-40, Math.min(40, Math.round(Number(a.dy) || 0)));
-    const say = String(out.say || '').replace(/[|\r\n]/g, ' ').slice(0, 90);
+    // two-way GOD channel: if the voice spoke this turn, the survivor replies out loud
+    const reply = String(out.reply || '').replace(/[\r\n]/g, ' ').trim().slice(0, 120);
+    if (god.length && reply) {
+      state.chat.push({ from: 'claude', text: reply, t: new Date().toISOString().slice(11, 19) });
+      state.chat = state.chat.slice(-40);
+      log('reply', reply);
+    }
+    // speak the reply in-game (it takes priority over an ordinary remark this beat)
+    const say = String((god.length && reply) ? reply : (out.say || '')).replace(/[|\r\n]/g, ' ').slice(0, 90);
     const thoughtField = String(out.thought || '').replace(/[|\r\n]/g, ' ').slice(0, 200);
     // hold the major goal: only update it when the model actually returns one (never blank it out)
     if (out.goal && String(out.goal).trim()) state.goal = String(out.goal).trim().slice(0, 200);
@@ -221,7 +233,10 @@ input{width:70%;background:#151b22;border:1px solid #26303a;color:#dde3ea;paddin
 <div class="bubble" id="thought"></div>
 <div class="bubble say" id="say"></div>
 <div class="grid" id="stats"></div>
-<p><input id="god" placeholder="speak to him as the voice from beyond…"><button onclick="sendGod()">send</button></p>
+<h1 style="font-size:14px;margin-top:20px">The voice from beyond</h1>
+<div id="chat" style="background:#0c0f13;border-radius:6px;padding:10px;max-height:240px;overflow:auto;margin-bottom:8px;display:flex;flex-direction:column;gap:6px"></div>
+<p style="display:flex;gap:8px"><input id="god" placeholder="speak to him… (Enter to send)" onkeydown="if(event.key==='Enter')sendGod()" style="flex:1"><button onclick="sendGod()">send</button></p>
+<h1 style="font-size:14px;margin-top:16px">Log</h1>
 <div id="log"></div>
 <script>
 function bar(label,v,inv){const pct=Math.round(v*100);const dang=(inv?v>0.7:v<0.3)?' danger':'';
@@ -236,9 +251,13 @@ const p=s.percept;if(p){document.getElementById('stats').innerHTML=
 bar('hp',p.hp/100*1,false).replace(/>\\d+</,'>'+p.hp+'<')+bar('hunger',p.hunger,true)+bar('thirst',p.thirst,true)+bar('fatigue',p.fatigue,true)+bar('panic',p.panic,true)+
 '<div class="stat"><b>zombies</b>'+p.zClose+' close / '+p.zNear+' near<div class="note">nearest '+p.zDist+' '+p.zDir+'</div></div>'+
 '<div class="stat"><b>food items</b>'+p.foods+'</div>';}
+const chat=s.chat||[];const cbox=document.getElementById('chat');
+cbox.innerHTML=chat.map(function(m){var god=m.from==='god';
+return '<div style="align-self:'+(god?'flex-end':'flex-start')+';max-width:78%;background:'+(god?'#26303a':'#1c2733')+';border-left:3px solid '+(god?'#ffd479':'#7fd1b9')+';padding:6px 10px;border-radius:6px"><div style="font-size:10px;color:#8899aa;text-transform:uppercase">'+(god?'you':'him')+' · '+m.t+'</div>'+m.text+'</div>';}).join('');
+cbox.scrollTop=cbox.scrollHeight;
 document.getElementById('log').textContent=s.log.map(l=>'['+l.t+'] '+l.kind+': '+l.text).reverse().join('\\n');
 }catch(e){}}
-async function sendGod(){const i=document.getElementById('god');if(!i.value)return;await fetch('/god?text='+encodeURIComponent(i.value));i.value='';}
+async function sendGod(){const i=document.getElementById('god');if(!i.value)return;const t=i.value;i.value='';await fetch('/god?text='+encodeURIComponent(t));tick();}
 setInterval(tick,2000);tick();
 </script>`;
 
@@ -250,7 +269,13 @@ http.createServer((req, res) => {
   }
   if (u.pathname === '/god') {
     const text = (u.searchParams.get('text') || '').slice(0, 300);
-    if (text) { godQueue.push(text); log('god', text); }
+    if (text) {
+      godQueue.push(text);
+      log('god', text);
+      state.chat.push({ from: 'god', text, t: new Date().toISOString().slice(11, 19) });
+      state.chat = state.chat.slice(-40);
+      saveState();
+    }
     res.writeHead(200); return res.end('ok');
   }
   if (u.pathname === '/api/state') {
@@ -258,7 +283,7 @@ http.createServer((req, res) => {
     return res.end(JSON.stringify({
       percept, perceptFresh: Date.now() - perceptAt < 5000, seq: state.seq,
       lastThought, lastSay: (intentLine.split('|')[4] || ''), lastAction, brainNote,
-      goal: state.goal, subtask: state.subtask,
+      goal: state.goal, subtask: state.subtask, chat: state.chat.slice(-24),
       memory: state.memory, log: state.log.slice(-60),
     }));
   }
